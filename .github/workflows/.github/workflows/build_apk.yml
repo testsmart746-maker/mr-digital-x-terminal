@@ -16,11 +16,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK (for apksigner/zipalign)
-        uses: android-actions/setup-android@v3
+      - name: Download and set up Android command-line tools
+        run: |
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          cd "$HOME/android-sdk/cmdline-tools"
+          curl -L -o tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q tools.zip
+          mv cmdline-tools latest
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$HOME/android-sdk/platform-tools" >> "$GITHUB_PATH"
 
-      - name: Install build-tools
-        run: sdkmanager --install "build-tools;34.0.0"
+      - name: Accept licenses and install build-tools
+        run: |
+          yes | sdkmanager --licenses --sdk_root="$HOME/android-sdk" || true
+          sdkmanager --sdk_root="$HOME/android-sdk" "build-tools;34.0.0" "platform-tools"
 
       - name: Download apktool
         run: |
@@ -43,12 +53,12 @@ jobs:
 
       - name: Zipalign
         run: |
-          BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+          BUILD_TOOLS="$HOME/android-sdk/build-tools/34.0.0"
           "$BUILD_TOOLS/zipalign" -f -p 4 app-unsigned.apk app-aligned.apk
 
       - name: Sign APK
         run: |
-          BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+          BUILD_TOOLS="$HOME/android-sdk/build-tools/34.0.0"
           "$BUILD_TOOLS/apksigner" sign \
             --ks debug.keystore --ks-pass pass:android --key-pass pass:android \
             --out app.apk app-aligned.apk
